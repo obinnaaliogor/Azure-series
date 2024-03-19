@@ -1,4 +1,3 @@
-# Azure Zero to Hero Course
 
 ## If you like the content, Don't forget to give this repository a :star:
 
