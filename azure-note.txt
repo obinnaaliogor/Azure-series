@@ -84,3 +84,97 @@ Configure DNAT rule on azure:
 to allow traffic from source * or my ip,  destination ip address <firewall public ip> protocol <tcp> destination port <4000>  translated type <ip address> translated address <private ip of the vm>
 
 AZURE STORAGE:
+
+
+ Automate Azure Resources using Azure CLI:
+   Install or upgrade azure cli.
+   check current version run; az version
+Reference:
+  https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-macos#update
+  Using the CLI to create resources is prone to error, we can introduce a bit of automation by using the CLI to create diff resources.
+
+Common Azure CLI commands for managing Azure resources:
+Reference:
+  https://learn.microsoft.com/en-us/azure/virtual-machines/linux/cli-manage
+  This ensures automation, reduction of error and efficiency.
+
+  ERROR WHY LOGIN IN TO AZURE:
+
+➜  Azure-series git:(main) ✗ ./create_vm.sh
+AADSTS50076: Due to a configuration change made by your administrator, or because you moved to a new location, you must use multi-factor authentication to access '797f4846-ba00-4fd7-ba43-dac1f8f63013'. Trace ID: 3a8be455-0c91-4eb0-95fb-f1d78e1e2f00 Correlation ID: cfc550eb-e6b2-4928-8a22-6dd7135e377e Timestamp: 2024-03-21 16:32:19Z
+Interactive authentication is needed. Please run:
+az login --scope https://management.core.windows.net//.default
+
+resolved by running:
+az login --tenant <tenant-id>
+This is b/c mfa is needed, a code will be sent to the email act associated with your azure act.
+or run
+
+Interactive authentication is needed. Please run:
+az login --scope https://management.core.windows.net//.default
+This will resolve the issue..
+
+
+Manage azure subscription:
+To switch between Azure subscriptions using the Azure CLI, you can use the `az account set` command followed by the subscription
+ID or name of the subscription you want to switch to. Here's the general syntax:
+
+```
+az account set --subscription SUBSCRIPTION_ID_OR_NAME
+```
+
+Replace `SUBSCRIPTION_ID_OR_NAME` with either the subscription ID or the name of the subscription you want to switch to.
+You can find the subscription ID and names of your subscriptions by running the following command:
+
+```
+az account list --output table
+```
+
+This command will list all the subscriptions associated with your account along with their IDs and names.
+Once you have the subscription ID or name, you can use the `az account set` command to switch to that subscription. Here's an example:
+
+```
+az account set --subscription "My Subscription"
+```
+
+Replace `"My Subscription"` with the name of the subscription you want to switch to.
+
+After running the `az account set` command, your default subscription will be updated, and subsequent Azure CLI commands will be executed in the context of the newly selected subscription.
+---
+az account show --output table
+This command will display information about the currently selected subscription, including its ID,
+name, and other details, in a tabular format. The subscription marked as (current) is the one currently in use.
+
+Create resource Group:
+az group create --name myResourceGroup --location eastus
+Reference:
+  https://learn.microsoft.com/en-us/cli/azure/manage-azure-groups-azure-cli
+
+  To ssh into the machine created from your script.
+  click connect on the console and copy the command ex:
+  click on Native SSH
+  ssh -i ~/.ssh/id_rsa.pem wiz_obi@52.255.174.251
+  The user and the ip will be there
+
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: test-network-policy
+  namespace: default
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          project: myproject
+    - podSelector:
+        matchLabels:
+          role: frontend
+
+
