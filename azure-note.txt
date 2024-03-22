@@ -163,10 +163,11 @@ az deployment group create --resource-group arm-vscode --template-file azuredepl
 Useful links:
   https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/template-tutorial-add-parameters?tabs=azure-cli
   https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-visual-studio-code?tabs=CLI
+  https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/storageaccounts?pivots=deployment-language-arm-template
 
   We have the.
   1. parameters --> repititive names, that can be used accross env
-  2. funtions --->
+  2. funtions -->
   3. resources  --> service or resource to create
   4. variables --> container to store dynamic values
   5. outputs --> Things you want to get out of the created resource, say public ip of an vm

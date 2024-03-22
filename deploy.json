@@ -28,7 +28,9 @@
     }
     },
     "functions": [],
-    "variables": {},
+    "variables": {
+        //You can also use variable to set names of resources
+    },
     "resources": [{
         "name": "[parameters ('storageAccountName')]",
         "type": "Microsoft.Storage/storageAccounts",
