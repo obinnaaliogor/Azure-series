@@ -1,0 +1,46 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "storageAccountName": {
+            "type": "string",
+            "metadata": {
+                "description": "storage Account Name"
+            },
+            "minLength": 3,
+            "maxLength": 24
+
+        },
+        //Creating the second parameter. use comma to separate the params.
+    "storageSKU": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_GRS",
+        "Standard_RAGRS",
+        "Standard_ZRS",
+        "Premium_LRS",
+        "Premium_ZRS",
+        "Standard_GZRS",
+        "Standard_RAGZRS"
+      ]
+    }
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [{
+        "name": "[parameters ('storageAccountName')]",
+        "type": "Microsoft.Storage/storageAccounts",
+        "apiVersion": "2023-01-01",
+        "tags": {
+            "displayName": ""
+        },
+        "location": "[resourceGroup().location]",
+        "kind": "StorageV2",
+        "sku": {
+         "name":  "[parameters ('storageSKU')]"
+        }
+    }],
+    "outputs": {}
+}

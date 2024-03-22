@@ -156,25 +156,17 @@ Reference:
   ssh -i ~/.ssh/id_rsa.pem wiz_obi@52.255.174.251
   The user and the ip will be there
 
+ARM template:
+az group create --name arm-vscode --location eastus
+az deployment group create --resource-group arm-vscode --template-file azuredeploy.json --parameters azuredeploy.parameters.json
 
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: test-network-policy
-  namespace: default
-spec:
-  podSelector:
-    matchLabels:
-      role: db
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          project: myproject
-    - podSelector:
-        matchLabels:
-          role: frontend
+Useful links:
+  https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/template-tutorial-add-parameters?tabs=azure-cli
+  https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-visual-studio-code?tabs=CLI
 
-
+  We have the.
+  1. parameters --> repititive names, that can be used accross env
+  2. funtions --->
+  3. resources  --> service or resource to create
+  4. variables --> container to store dynamic values
+  5. outputs --> Things you want to get out of the created resource, say public ip of an vm
