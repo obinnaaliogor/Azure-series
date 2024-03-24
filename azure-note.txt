@@ -84,7 +84,7 @@ Configure DNAT rule on azure:
 to allow traffic from source * or my ip,  destination ip address <firewall public ip> protocol <tcp> destination port <4000>  translated type <ip address> translated address <private ip of the vm>
 
 AZURE STORAGE:
-
+NB: Blob storage --> This also means containers
 
  Automate Azure Resources using Azure CLI:
    Install or upgrade azure cli.
@@ -171,3 +171,40 @@ Useful links:
   3. resources  --> service or resource to create
   4. variables --> container to store dynamic values
   5. outputs --> Things you want to get out of the created resource, say public ip of an vm
+
+Azure IAM from Basics
+Azure Managed Identities Demo with Microsoft Entra
+Authentications: You have users and groups and authorizations we have actions that can be performed by the authenticated entities..
+Authorizations we have roles..
+When you create a user account with the root user and sign into that new account, you have sucessfully authenticated into the azure account but you
+dont have any role yet.. As a result you can perform any action like creating resources under that account.
+When you have been assigned a role to create resources then that is authorization.
+
+Important: You can create custom role and privileges and assign it to a user or group. To create a custom role you have to activate microsoft entra id premium p1 or p2.
+Group: This is used to assign roles to group of users.
+say you have devops and developers group, instead of creating and assign individual roles to users, you can create a group, add roles to the group.
+Then add the users to that group and theyll inherit the permission or role associated to that group..
+1 Authentications
+2 Authorizations
+3 roles
+4 users
+5 groups
+
+Important: How about resources trying to access each other?
+Say you have a requirment that a vm needs access to a blob storage..
+How do you implement this? We use service principle and managed Identities.
+As stated earlier, role is what a user or service can do, action the user can perform on a resource or action a service can perform on another service.
+In terms of service to service interactions we use service principle and managed Identities...
+We create a service principle or managed Identities for the vm to access data in the blob storage.
+This role is assigned to the entity/service that needs to access the service.
+Since vm wants to access resources in blob storage service, we then create a role that will enable vm to do this and assign it to the vm..
+
+Important: when a service wants to talk to other service, in azure we use the concept of.
+1. service principle --> This is created and managed by the user and access of the service principle rotated by the user.
+2. managed Identities --> This azure manages the access rotation once a user creates it.
+Summarily ..
+grant a role to the vm called managed identity to be able to access blob containers..
+NB: We have system assigned managed identity and user assigned managed identity.
+When you enable system assigned managed identity, the system automatically assigns the service or resource a role based on the managed identity.
+also note that an Object pinciple ID is generated.
+Go to the storage account and add role assignment..
