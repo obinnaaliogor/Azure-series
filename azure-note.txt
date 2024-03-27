@@ -207,4 +207,760 @@ grant a role to the vm called managed identity to be able to access blob contain
 NB: We have system assigned managed identity and user assigned managed identity.
 When you enable system assigned managed identity, the system automatically assigns the service or resource a role based on the managed identity.
 also note that an Object pinciple ID is generated.
+<<<<<<< HEAD
+Go to the storage account and add role assignment..
+
+A sample script is on day 12.
+
+AZURE DEVOPS:
+---------------------------------
+Architecture
+1. Overview
+2. Boards --> A typical example is Jira
+3. Repos --> Used for the storage of application code, a source code repository.
+4. Pipelines --> CICD section, you define stages, jobs and steps
+5. Test Plans --> A central location where your team can coordinate all your manual test activities, track progress, and get critical insights.
+ As a user with basic access level, here is how you can get started right away.
+
+6. Artifacts --> Used for the storage of cicd endproduct or built artifact..
+
+Use Azure Pipelines to support the following scenarios:
+
+    Works with any language or platform
+    Deploys to different types of targets at the same time
+    Integrates with Azure deployments
+    Builds on Windows, Linux, or Mac machines
+    Integrates with GitHub
+    Works with open-source projects
+
+Reference:
+  https://learn.microsoft.com/en-us/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops
+  https://learn.microsoft.com/en-us/azure/devops/pipelines/get-started/yaml-pipeline-editor?view=azure-devops
+
+  Lets deploy the example voting app on azure devops:
+  First test the application locally and see that it works b4 putting it to a cicd pipelines.
+
+  1. Create organization,
+  2. create project
+  3. import your project code from github to azure devops repo.
+  4. create a azure container registry to store built images.
+  5. create pipelines for the 3 microservice applications, worker, result and vote.
+  First complete the ci jobs which is running of unit test, static test, build of image and pushing built image to the image registry.
+
+  Reference:
+    https://learn.microsoft.com/en-us/azure/devops/pipelines/ecosystems/containers/build-image?view=azure-devops
+
+    sample yaml file for the cicd pipeline
+    # Docker
+# Build and push an image to Azure Container Registry
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: '51f380a4-6599-4df5-b1cb-8d8880badb14'
+  imageRepository: 'nikesales'
+  containerRegistry: 'nikesalescicd.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/result/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName) #azure do not provide runner or pool for a free account..
+    steps:
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+Overview,
+trigger:
+- main
+You can also specify on which action "trigger" should the pipeline run?
+Since we have 3 microservices, you define that if a change is made to a specific code of one of the microservice that the pipeline should be triggered,
+say a change to the vote, worker or result app code, a pipeline run should be triggered.
+This way you wont be building the entire microservice code.. If a change got made in the vote, pipelines run same for result and worker.
+As you know in some cases changes cant be done in all microservices at once.. Specify the path in the app code that once change is made the pipeline gets triggered....
+
+Demands and capabilities:
+Reference:
+  https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/pool-demands?view=azure-pipelines
+
+  Important:
+  If you created a pool to run you jobs, ensure you register the name of the agent in the pipeline after Referencing it in the pipeline yaml.
+  go to settings, enter the vm or pool name and generate a code to run on you vm to enable it authenticate with the pipeline..
+
+  Reference configuration for the pool:
+    https://learn.microsoft.com/en-us/azure/devops/pipelines/agents/linux-agent?view=azure-devops
+    Important:
+    Create a PAT that will be used to configure the pool
+    use agent pool server url while authenticating with the vm as
+    Server URL
+Azure Pipelines: https://dev.azure.com/{your-organization}
+
+Important:
+ECR registry, on the azure Devops pipeline, click on settings and click on Service connections --> New connections.
+Then click docker registry --> choose either azure or docker at this point ---> for azure choose Authentication Type which can be
+1 service principle or managed service Identities.---> Service connection name <this can be any name>.
+This is how you authenticate your azure or any registry to your azure pipeline.
+
+Reference:
+  https://stackoverflow.com/questions/59439705/what-is-a-docker-registry-service-connection
+
+  CONTINUOS DELIVERY PIPELINE FOR VOTING APP..
+  We used azure devops for the CI, we will use argocd for the cd.. It is a Gitops pull mechanism
+  We will authenticate argocd with azure devops repo to monitor for changes in our source code and then deploy our app to kubernetes cluster.
+  1. create Azure kubernetes cluster.
+  2. While creating AKS, we require agentPool, which is vm.. This is b/c AKS is a managed service and to run our workloads, pods, containers, applications we need a vm..
+  agentpool in aks is just like nodegroup in eks, theyre all used to group vm to run our k8s workloads..
+  3. set the agentpool, min 1 and max of 2 depending on your requirment.. This is b/c we will use azure scaleset where the vm can scale up based on demand.
+  Important:
+  you can have diff agentpool,
+  1. system agentpool
+  2. user agentpool
+  theyre can be used to manage diff aspect of your workload..
+
+  NB: validating your aks creation, if you run into resource quota issue, change the region..
+
+  Question:
+  Why gitops?
+  why shell scripts?
+  There is another resource in gitops called argo image updater but its not in GA at the moment.
+  Shell script is generic and the agent is linux vm reason for shell script..
+  This is why we use python/shell script.
+  Why gitops?
+  Continous reconciliation, argocd watches the repo and make the desired state the actual state of the cluster.
+  It has the sourcecode as it sole point of truth. changes made directly to the cluster is reverted.
+  2. deploy argocd in the kubernetes cluster.
+  3. configure argocd
+  4. create update pipeline for the cd jobs, this will monitor the said path in the repo for changes and this then gets deployed into the k8s cluster.
+  NB:
+    Before proceeding, you have to install azure cli, login to the sub for the azureagent to manage the aks and deploy app see below
+  -------
+
+
+  Reference to argocd docs.
+  https://argo-cd.readthedocs.io/en/stable/
+  Note theres no direct connection between the ci and the cd with argocd, argocd handles the cd by monitoring changes in our source code repo and make our desired state the actual state
+  of the kubernetes cluster..
+  AKS command to run in azureagent:
+  https://learn.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-get-credentials
+  commands:
+
+  1. install azure cli
+  https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt
+  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+  2. login to your azure sub
+  3. az account set --subscription 223b3de2-144c-49ec-93dc-765b9cebf465
+  4. az aks get-credentials --resource-group nike-sales-dev-rg --name nike-demo-aks-cluster --overwrite-existing
+
+  5 install kubectl
+ Run: sudo az aks install-cli --client-version=1.27.9
+https://learn.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-install-cli
+
+
+If your repository is hosted on Azure DevOps instead of GitHub, you would need to adjust the URL and potentially the authentication method in the Secret accordingly.
+Azure DevOps uses different URLs and authentication mechanisms compared to GitHub. Here's how you can modify the Secret manifest:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: https://dev.azure.com/YourOrganization/YourProject/_git/YourRepo
+  token: <your-personal-access-token>
+```
+
+Here's what changed:
+
+- `url`: The URL of the Azure DevOps repository.
+Replace `YourOrganization`, `YourProject`, and `YourRepo` with your actual Azure DevOps organization name, project name, and repository name, respectively.
+- `token`: Instead of using a username and password combination, Azure DevOps typically requires a Personal Access Token (PAT) for authentication.
+ Replace `<your-personal-access-token>` with your actual PAT.
+
+Ensure that you have created a Personal Access Token in your Azure DevOps account with the appropriate permissions to access the repository.
+ The token should have at least "Read" permissions if you only intend to pull code from the repository, or "Code (Read & Write)" permissions
+  if you also intend to push changes back to the repository.
+
+After updating the Secret manifest, you can apply it to your Kubernetes cluster using `kubectl apply -f <filename.yaml>`.
+This will create or update the Secret in the specified namespace (`argocd` in this case), allowing ArgoCD to access your Azure DevOps repository using the provided credentials.
+
+For github use:
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository #targeting repository..
+stringData:
+  type: git
+  url: https://github.com/yourrepo.git  #url of your github repo
+  password: <your-token>
+  username: yourusername
+  ##NOTE IF YOUR REPOSITORY IS NOT A PUBLIC REPO, THEN YOU HAVE TO AUTHORIZE ARGOCD
+      #TO DEPLOY THE APPLICATION USING THE FOLLOWING MANIFEST FILE DEPLOYED IN YOUR K8S CLUSTER.
+----------------
+You can create a PAT and add repo that you want argocd to read from the settings in argocd UI
+In azure for instance, sample repo:
+https://binxingnigltd@dev.azure.com/binxingnigltd/nikesales/_git/nikesales
+where binxingnigltd is the org name, remove it and add PAT example
+https://<PAT>@dev.azure.com/binxingnigltd/nikesales/_git/nikesales
+then connect the repo for it to show successful.
+Then create application on the UI.
+click on application on argocd ui and enter the required data.
+
+Important:
+  Azure container registry dockerRegistryServiceConnection.
+  To get this,
+  After adding a "Docker Registry" service connection, select it from the list of service connections. The url will look something like:
+
+https://your-org.visualstudio.com/YourProject/_settings/adminservices?resourceId=0b6c0705-9fbb-40ec-b629-95cd92856257
+
+Take the resourceId from the query string, which is "0b6c0705-9fbb-40ec-b629-95cd92856257" in the above example, and use it as the dockerRegistryServiceConnection value.
+Reference:
+https://stackoverflow.com/questions/59439705/what-is-a-docker-registry-service-connection
+
+Important:
+  As part of the stages in building the pipeline, we include update image in which we will run a shell script that will update our image tags in a target directory.
+
+  #!/bin/bash
+
+set -x
+
+# Set the repository URL
+REPO_URL="https://<ACCESS-TOKEN>@dev.azure.com/<AZURE-DEVOPS-ORG-NAME>/voting-app/_git/voting-app"
+
+# Clone the git repository into the /tmp directory
+git clone "$REPO_URL" /tmp/temp_repo
+
+# Navigate into the cloned repository directory
+cd /tmp/temp_repo
+
+# Make changes to the Kubernetes manifest file(s)
+# For example, let's say you want to change the image tag in a deployment.yaml file
+sed -i "s|image:.*|image: <ACR-REGISTRY-NAME>/$2:$3|g" k8s-specifications/$1-deployment.yaml
+
+# Add the modified files
+git add .
+
+# Commit the changes
+git commit -m "Update Kubernetes manifest"
+
+# Push the changes back to the repository
+git push
+
+# Cleanup: remove the temporary directory
+rm -rf /tmp/temp_repo
+
+<<<<<<< HEAD
+<<<<<<< HEAD
+Notes on Azure
+Virtual Machine types:
+Reference: https://azure.microsoft.com/en-in/pricing/details/virtual-machines/series/
+Create a vm depending on your workload requirement and choose configure access to the vm by using ASG and NSG.
+
+AZURE VNET:
+ASG: This is used to group diff application or vm to a consolidated set of security group.
+It enhances NSG, you'll have to use ASG in collaboration with NSG. ASG will select all vm and you can use NSG to set traffic flow from ASG security group.
+
+
+**Azure Virtual Network (VNet):**
+A VNet is an isolated network within the Azure cloud that allows various Azure resources, such as VMs (Virtual Machines), to securely communicate with each other,
+the internet, and on-premises networks. It's the fundamental building block for your private network in Azure.
+
+**Network Security Groups (NSG):**
+NSGs are used to filter network traffic to and from Azure resources in an Azure VNet. An NSG can contain multiple inbound and outbound security rules that allow
+or deny traffic based on several parameters, such as protocol, port, and source or destination IP address. NSGs can be associated with subnets
+in the VNet or directly to individual resources.
+
+**Application Security Groups (ASG):**
+ASGs are a feature that enhances the capabilities of NSGs, allowing you to define fine-grained network security policies based on workloads or applications.
+ Instead of defining rules based on IP addresses, you can group virtual machines and define network security policies based on these groups.
+ This abstraction simplifies the management and maintenance of network security rules, as you don't need to update rules when adding or removing VMs in your application group.
+
+**How ASGs Enhance NSGs:**
+ASGs are used in conjunction with NSGs to refine how security rules are applied. When you associate a VM to an ASG,
+you can then use that ASG as a source or destination in NSG security rules. This setup allows for more granular control over
+traffic flow between different groups of VMs or applications within your Azure VNet. For instance, you can easily allow communication
+between your front-end and back-end layers without having to specify individual IP addresses.
+
+By utilizing ASGs with NSGs, you can:
+- Dynamically manage security policies as you scale your environment up or down.
+- Apply and maintain security rules more efficiently by grouping VMs according to their roles, applications, or workloads.
+- Improve the clarity of your security rules, making it easier to understand and audit the traffic flow within your VNet.
+
+In summary, ASGs help organize your virtual machines into logical groups that can be referenced in NSG rules, simplifying the management
+and application of network security policies in a dynamic cloud environment.
+
+
+
+Important:
+  A firewall and a Web Application Firewall (WAF) serve different purposes, and in the context of Azure, they are distinct offerings designed
+  for different security needs.
+
+### Azure Firewall
+
+Azure Firewall is a managed, cloud-based network security service that protects your Azure Virtual Network resources. It's a stateful firewall
+as a service with built-in high availability and
+
+unrestricted cloud scalability. Azure Firewall provides outbound, inbound, and network-level traffic filtering and monitoring.
+ It can filter traffic between resources in a VNet, from the internet to the VNet, and even between different VNets. Key features include:
+- **FQDN filtering in network rules**
+- **Network traffic filtering rules**
+- **SNAT support for outbound internet connectivity**
+- **Integrated threat intelligence based on Microsoft Threat Intelligence**
+- **High availability built-in**
+- **Unrestricted cloud scalability**
+
+### Azure Web Application Firewall (WAF)
+
+Azure Web Application Firewall (WAF) is a specialized form of firewall focused on securing web applications. It is offered as part of Azure Application Gateway,
+ Azure Front Door Service, and Azure Content Delivery Network (CDN) services. WAF is designed to protect web applications from common exploits and vulnerabilities,
+ such as SQL injection, cross-site scripting (XSS), and other web-based attacks. WAF operates at Layer 7 (HTTP/HTTPS)
+ and uses rules from the OWASP (Open Web Application Security Project) core rule sets to identify and block malicious traffic. Key features include:
+- **Protection against web vulnerabilities and attacks**
+- **Custom rules and managed rule sets**
+- **Monitoring and logging capabilities**
+- **Integration with Azure Application Gateway, Front Door, and CDN**
+
+### Key Differences
+
+- **Scope of Protection**: Azure Firewall provides broad network-level protection and monitoring for resources within
+Azure Virtual Networks, including filtering outbound, inbound, and internal network traffic. On the other hand, Azure WAF
+ is specifically designed to protect web applications from common web vulnerabilities and attacks.
+- **Layer of Operation**: Azure Firewall operates at the network layer (Layers 3 and 4), while Azure WAF operates at the
+application layer (Layer 7) to inspect HTTP/HTTPS traffic.
+- **Use Cases**: Use Azure Firewall when you need general network security and traffic filtering for all types of resources in your VNet.
+ Choose Azure WAF when you specifically need to protect web applications from attacks and vulnerabilities.
+
+In summary, while both services provide security features, they cater to different aspects of network and application security within Azure.
+It's not uncommon for organizations to use both Azure Firewall and Azure WAF together to achieve comprehensive security coverage for their cloud resources and applications.
+
+Configure DNAT rule on azure:
+to allow traffic from source * or my ip,  destination ip address <firewall public ip> protocol <tcp> destination port <4000>  translated type <ip address> translated address <private ip of the vm>
+
+AZURE STORAGE:
+NB: Blob storage --> This also means containers
+
+ Automate Azure Resources using Azure CLI:
+   Install or upgrade azure cli.
+   check current version run; az version
+Reference:
+  https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-macos#update
+  Using the CLI to create resources is prone to error, we can introduce a bit of automation by using the CLI to create diff resources.
+
+Common Azure CLI commands for managing Azure resources:
+Reference:
+  https://learn.microsoft.com/en-us/azure/virtual-machines/linux/cli-manage
+  This ensures automation, reduction of error and efficiency.
+
+  ERROR WHY LOGIN IN TO AZURE:
+
+➜  Azure-series git:(main) ✗ ./create_vm.sh
+AADSTS50076: Due to a configuration change made by your administrator, or because you moved to a new location, you must use multi-factor authentication to access '797f4846-ba00-4fd7-ba43-dac1f8f63013'. Trace ID: 3a8be455-0c91-4eb0-95fb-f1d78e1e2f00 Correlation ID: cfc550eb-e6b2-4928-8a22-6dd7135e377e Timestamp: 2024-03-21 16:32:19Z
+Interactive authentication is needed. Please run:
+az login --scope https://management.core.windows.net//.default
+
+resolved by running:
+az login --tenant <tenant-id>
+This is b/c mfa is needed, a code will be sent to the email act associated with your azure act.
+or run
+
+Interactive authentication is needed. Please run:
+az login --scope https://management.core.windows.net//.default
+This will resolve the issue..
+
+
+Manage azure subscription:
+To switch between Azure subscriptions using the Azure CLI, you can use the `az account set` command followed by the subscription
+ID or name of the subscription you want to switch to. Here's the general syntax:
+
+```
+az account set --subscription SUBSCRIPTION_ID_OR_NAME
+```
+
+Replace `SUBSCRIPTION_ID_OR_NAME` with either the subscription ID or the name of the subscription you want to switch to.
+You can find the subscription ID and names of your subscriptions by running the following command:
+
+```
+az account list --output table
+```
+
+This command will list all the subscriptions associated with your account along with their IDs and names.
+Once you have the subscription ID or name, you can use the `az account set` command to switch to that subscription. Here's an example:
+
+```
+az account set --subscription "My Subscription"
+```
+
+Replace `"My Subscription"` with the name of the subscription you want to switch to.
+
+After running the `az account set` command, your default subscription will be updated, and subsequent Azure CLI commands will be executed in the context of the newly selected subscription.
+---
+az account show --output table
+This command will display information about the currently selected subscription, including its ID,
+name, and other details, in a tabular format. The subscription marked as (current) is the one currently in use.
+
+Create resource Group:
+az group create --name myResourceGroup --location eastus
+Reference:
+  https://learn.microsoft.com/en-us/cli/azure/manage-azure-groups-azure-cli
+
+  To ssh into the machine created from your script.
+  click connect on the console and copy the command ex:
+  click on Native SSH
+  ssh -i ~/.ssh/id_rsa.pem wiz_obi@52.255.174.251
+  The user and the ip will be there
+
+ARM template:
+az group create --name arm-vscode --location eastus
+az deployment group create --resource-group arm-vscode --template-file azuredeploy.json --parameters azuredeploy.parameters.json
+
+Useful links:
+  https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/template-tutorial-add-parameters?tabs=azure-cli
+  https://learn.microsoft.com/en-us/azure/azure-resource-manager/templates/quickstart-create-templates-use-visual-studio-code?tabs=CLI
+  https://learn.microsoft.com/en-us/azure/templates/microsoft.storage/storageaccounts?pivots=deployment-language-arm-template
+
+  We have the.
+  1. parameters --> repititive names, that can be used accross env
+  2. funtions -->
+  3. resources  --> service or resource to create
+  4. variables --> container to store dynamic values
+  5. outputs --> Things you want to get out of the created resource, say public ip of an vm
+
+Azure IAM from Basics
+Azure Managed Identities Demo with Microsoft Entra
+Authentications: You have users and groups and authorizations we have actions that can be performed by the authenticated entities..
+Authorizations we have roles..
+When you create a user account with the root user and sign into that new account, you have sucessfully authenticated into the azure account but you
+dont have any role yet.. As a result you can perform any action like creating resources under that account.
+When you have been assigned a role to create resources then that is authorization.
+
+Important: You can create custom role and privileges and assign it to a user or group. To create a custom role you have to activate microsoft entra id premium p1 or p2.
+Group: This is used to assign roles to group of users.
+say you have devops and developers group, instead of creating and assign individual roles to users, you can create a group, add roles to the group.
+Then add the users to that group and theyll inherit the permission or role associated to that group..
+1 Authentications
+2 Authorizations
+3 roles
+4 users
+5 groups
+
+Important: How about resources trying to access each other?
+Say you have a requirment that a vm needs access to a blob storage..
+How do you implement this? We use service principle and managed Identities.
+As stated earlier, role is what a user or service can do, action the user can perform on a resource or action a service can perform on another service.
+In terms of service to service interactions we use service principle and managed Identities...
+We create a service principle or managed Identities for the vm to access data in the blob storage.
+This role is assigned to the entity/service that needs to access the service.
+Since vm wants to access resources in blob storage service, we then create a role that will enable vm to do this and assign it to the vm..
+
+Important: when a service wants to talk to other service, in azure we use the concept of.
+1. service principle --> This is created and managed by the user and access of the service principle rotated by the user.
+2. managed Identities --> This azure manages the access rotation once a user creates it.
+Summarily ..
+grant a role to the vm called managed identity to be able to access blob containers..
+NB: We have system assigned managed identity and user assigned managed identity.
+When you enable system assigned managed identity, the system automatically assigns the service or resource a role based on the managed identity.
+also note that an Object pinciple ID is generated.
+Go to the storage account and add role assignment..
+
+A sample script is on day 12.
+
+AZURE DEVOPS:
+---------------------------------
+Architecture
+1. Overview
+2. Boards --> A typical example is Jira
+3. Repos --> Used for the storage of application code, a source code repository.
+4. Pipelines --> CICD section, you define stages, jobs and steps
+5. Test Plans --> A central location where your team can coordinate all your manual test activities, track progress, and get critical insights.
+ As a user with basic access level, here is how you can get started right away.
+
+6. Artifacts --> Used for the storage of cicd endproduct or built artifact..
+
+Use Azure Pipelines to support the following scenarios:
+
+    Works with any language or platform
+    Deploys to different types of targets at the same time
+    Integrates with Azure deployments
+    Builds on Windows, Linux, or Mac machines
+    Integrates with GitHub
+    Works with open-source projects
+
+Reference:
+  https://learn.microsoft.com/en-us/azure/devops/pipelines/get-started/what-is-azure-pipelines?view=azure-devops
+  https://learn.microsoft.com/en-us/azure/devops/pipelines/get-started/yaml-pipeline-editor?view=azure-devops
+
+  Lets deploy the example voting app on azure devops:
+  First test the application locally and see that it works b4 putting it to a cicd pipelines.
+
+  1. Create organization,
+  2. create project
+  3. import your project code from github to azure devops repo.
+  4. create a azure container registry to store built images.
+  5. create pipelines for the 3 microservice applications, worker, result and vote.
+  First complete the ci jobs which is running of unit test, static test, build of image and pushing built image to the image registry.
+
+  Reference:
+    https://learn.microsoft.com/en-us/azure/devops/pipelines/ecosystems/containers/build-image?view=azure-devops
+
+    sample yaml file for the cicd pipeline
+    # Docker
+# Build and push an image to Azure Container Registry
+# https://docs.microsoft.com/azure/devops/pipelines/languages/docker
+
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: '51f380a4-6599-4df5-b1cb-8d8880badb14'
+  imageRepository: 'nikesales'
+  containerRegistry: 'nikesalescicd.azurecr.io'
+  dockerfilePath: '$(Build.SourcesDirectory)/result/Dockerfile'
+  tag: '$(Build.BuildId)'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+stages:
+- stage: Build
+  displayName: Build and push stage
+  jobs:
+  - job: Build
+    displayName: Build
+    pool:
+      vmImage: $(vmImageName) #azure do not provide runner or pool for a free account..
+    steps:
+    - task: Docker@2
+      displayName: Build and push an image to container registry
+      inputs:
+        command: buildAndPush
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: $(dockerRegistryServiceConnection)
+        tags: |
+          $(tag)
+
+Overview,
+trigger:
+- main
+You can also specify on which action "trigger" should the pipeline run?
+Since we have 3 microservices, you define that if a change is made to a specific code of one of the microservice that the pipeline should be triggered,
+say a change to the vote, worker or result app code, a pipeline run should be triggered.
+This way you wont be building the entire microservice code.. If a change got made in the vote, pipelines run same for result and worker.
+As you know in some cases changes cant be done in all microservices at once.. Specify the path in the app code that once change is made the pipeline gets triggered....
+
+Demands and capabilities:
+Reference:
+  https://learn.microsoft.com/en-us/azure/devops/pipelines/yaml-schema/pool-demands?view=azure-pipelines
+
+  Important:
+  If you created a pool to run you jobs, ensure you register the name of the agent in the pipeline after Referencing it in the pipeline yaml.
+  go to settings, enter the vm or pool name and generate a code to run on you vm to enable it authenticate with the pipeline..
+
+  Reference configuration for the pool:
+    https://learn.microsoft.com/en-us/azure/devops/pipelines/agents/linux-agent?view=azure-devops
+    Important:
+    Create a PAT that will be used to configure the pool
+    use agent pool server url while authenticating with the vm as
+    Server URL
+Azure Pipelines: https://dev.azure.com/{your-organization}
+
+Important:
+ECR registry, on the azure Devops pipeline, click on settings and click on Service connections --> New connections.
+Then click docker registry --> choose either azure or docker at this point ---> for azure choose Authentication Type which can be
+1 service principle or managed service Identities.---> Service connection name <this can be any name>.
+This is how you authenticate your azure or any registry to your azure pipeline.
+
+Reference:
+  https://stackoverflow.com/questions/59439705/what-is-a-docker-registry-service-connection
+
+  CONTINUOS DELIVERY PIPELINE FOR VOTING APP..
+  We used azure devops for the CI, we will use argocd for the cd.. It is a Gitops pull mechanism
+  We will authenticate argocd with azure devops repo to monitor for changes in our source code and then deploy our app to kubernetes cluster.
+  1. create Azure kubernetes cluster.
+  2. While creating AKS, we require agentPool, which is vm.. This is b/c AKS is a managed service and to run our workloads, pods, containers, applications we need a vm..
+  agentpool in aks is just like nodegroup in eks, theyre all used to group vm to run our k8s workloads..
+  3. set the agentpool, min 1 and max of 2 depending on your requirment.. This is b/c we will use azure scaleset where the vm can scale up based on demand.
+  Important:
+  you can have diff agentpool,
+  1. system agentpool
+  2. user agentpool
+  theyre can be used to manage diff aspect of your workload..
+
+  NB: validating your aks creation, if you run into resource quota issue, change the region..
+
+  Question:
+  Why gitops?
+  why shell scripts?
+  There is another resource in gitops called argo image updater but its not in GA at the moment.
+  Shell script is generic and the agent is linux vm reason for shell script..
+  This is why we use python/shell script.
+  Why gitops?
+  Continous reconciliation, argocd watches the repo and make the desired state the actual state of the cluster.
+  It has the sourcecode as it sole point of truth. changes made directly to the cluster is reverted.
+  2. deploy argocd in the kubernetes cluster.
+  3. configure argocd
+  4. create update pipeline for the cd jobs, this will monitor the said path in the repo for changes and this then gets deployed into the k8s cluster.
+  NB:
+    Before proceeding, you have to install azure cli, login to the sub for the azureagent to manage the aks and deploy app see below
+  -------
+
+
+  Reference to argocd docs.
+  https://argo-cd.readthedocs.io/en/stable/
+  Note theres no direct connection between the ci and the cd with argocd, argocd handles the cd by monitoring changes in our source code repo and make our desired state the actual state
+  of the kubernetes cluster..
+  AKS command to run in azureagent:
+  https://learn.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-get-credentials
+  commands:
+
+  1. install azure cli
+  https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt
+  curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+
+  2. login to your azure sub
+  3. az account set --subscription 223b3de2-144c-49ec-93dc-765b9cebf465
+  4. az aks get-credentials --resource-group nike-sales-dev-rg --name nike-demo-aks-cluster --overwrite-existing
+
+  5 install kubectl
+ Run: sudo az aks install-cli --client-version=1.27.9
+https://learn.microsoft.com/en-us/cli/azure/aks?view=azure-cli-latest#az-aks-install-cli
+
+
+If your repository is hosted on Azure DevOps instead of GitHub, you would need to adjust the URL and potentially the authentication method in the Secret accordingly.
+Azure DevOps uses different URLs and authentication mechanisms compared to GitHub. Here's how you can modify the Secret manifest:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: git
+  url: https://dev.azure.com/YourOrganization/YourProject/_git/YourRepo
+  token: <your-personal-access-token>
+```
+
+Here's what changed:
+
+- `url`: The URL of the Azure DevOps repository.
+Replace `YourOrganization`, `YourProject`, and `YourRepo` with your actual Azure DevOps organization name, project name, and repository name, respectively.
+- `token`: Instead of using a username and password combination, Azure DevOps typically requires a Personal Access Token (PAT) for authentication.
+ Replace `<your-personal-access-token>` with your actual PAT.
+
+Ensure that you have created a Personal Access Token in your Azure DevOps account with the appropriate permissions to access the repository.
+ The token should have at least "Read" permissions if you only intend to pull code from the repository, or "Code (Read & Write)" permissions
+  if you also intend to push changes back to the repository.
+
+After updating the Secret manifest, you can apply it to your Kubernetes cluster using `kubectl apply -f <filename.yaml>`.
+This will create or update the Secret in the specified namespace (`argocd` in this case), allowing ArgoCD to access your Azure DevOps repository using the provided credentials.
+
+For github use:
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argocd-repo
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository #targeting repository..
+stringData:
+  type: git
+  url: https://github.com/yourrepo.git  #url of your github repo
+  password: <your-token>
+  username: yourusername
+  ##NOTE IF YOUR REPOSITORY IS NOT A PUBLIC REPO, THEN YOU HAVE TO AUTHORIZE ARGOCD
+      #TO DEPLOY THE APPLICATION USING THE FOLLOWING MANIFEST FILE DEPLOYED IN YOUR K8S CLUSTER.
+----------------
+You can create a PAT and add repo that you want argocd to read from the settings in argocd UI
+In azure for instance, sample repo:
+https://binxingnigltd@dev.azure.com/binxingnigltd/nikesales/_git/nikesales
+where binxingnigltd is the org name, remove it and add PAT example
+https://<PAT>@dev.azure.com/binxingnigltd/nikesales/_git/nikesales
+then connect the repo for it to show successful.
+Then create application on the UI.
+click on application on argocd ui and enter the required data.
+
+Important:
+  Azure container registry dockerRegistryServiceConnection.
+  To get this,
+  After adding a "Docker Registry" service connection, select it from the list of service connections. The url will look something like:
+
+https://your-org.visualstudio.com/YourProject/_settings/adminservices?resourceId=0b6c0705-9fbb-40ec-b629-95cd92856257
+
+Take the resourceId from the query string, which is "0b6c0705-9fbb-40ec-b629-95cd92856257" in the above example, and use it as the dockerRegistryServiceConnection value.
+Reference:
+https://stackoverflow.com/questions/59439705/what-is-a-docker-registry-service-connection
+
+Important:
+  As part of the stages in building the pipeline, we include update image in which we will run a shell script that will update our image tags in a target directory.
+
+  #!/bin/bash
+
+set -x
+
+# Set the repository URL
+REPO_URL="https://<ACCESS-TOKEN>@dev.azure.com/<AZURE-DEVOPS-ORG-NAME>/voting-app/_git/voting-app"
+
+# Clone the git repository into the /tmp directory
+git clone "$REPO_URL" /tmp/temp_repo
+
+# Navigate into the cloned repository directory
+cd /tmp/temp_repo
+
+# Make changes to the Kubernetes manifest file(s)
+# For example, let's say you want to change the image tag in a deployment.yaml file
+sed -i "s|image:.*|image: <ACR-REGISTRY-NAME>/$2:$3|g" k8s-specifications/$1-deployment.yaml
+
+# Add the modified files
+git add .
+
+# Commit the changes
+git commit -m "Update Kubernetes manifest"
+
+# Push the changes back to the repository
+git push
+
+# Cleanup: remove the temporary directory
+rm -rf /tmp/temp_repo
+
+imagepullSecret:
+  kubectl create secret docker-registry azurereg \
+    --namespace default \
+    --docker-server=<> \
+    --docker-username=<> \
+    --docker-password=<>
 Go to the storage account and add role assignment..
