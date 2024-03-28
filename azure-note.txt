@@ -371,7 +371,7 @@ Reference:
 
   2. login to your azure sub
   3. az account set --subscription 223b3de2-144c-49ec-93dc-765b9cebf465
-  4. az aks get-credentials --resource-group nike-sales-dev-rg --name nike-demo-aks-cluster --overwrite-existing
+  4. az aks get-credentials --resource-group stans-robot-shop --name stans-robot-shop-demo --overwrite-existing
 
   5 install kubectl
  Run: sudo az aks install-cli --client-version=1.27.9
@@ -964,3 +964,204 @@ imagepullSecret:
     --docker-username=<> \
     --docker-password=<>
 Go to the storage account and add role assignment..
+
+Important:
+Open port 30000-32676 for the nodePort in the nsg for your AKS.
+type vmss --> virtual machine scale set and set the nsg rule by clickng on instance and network and inbound rule...
+
+
+Important:
+ Let's break down each part of the script to understand its purpose and how it operates:
+
+1. **Shebang and Set Debug Mode**:
+   ```bash
+   #!/bin/bash
+
+   set -x
+   ```
+   - The shebang `#!/bin/bash` at the beginning specifies that the script should be executed using Bash.
+   - `set -x` turns on debugging mode, which causes Bash to display each command it executes. This is useful for understanding the flow of the script and debugging any issues.
+
+2. **Set Repository URL**:
+   ```bash
+   REPO_URL="https://<ACCESS-TOKEN>@dev.azure.com/<AZURE-DEVOPS-ORG-NAME>/voting-app/_git/voting-app"
+   ```
+   - This line sets the URL of the Azure DevOps Git repository. You need to replace `<ACCESS-TOKEN>` and `<AZURE-DEVOPS-ORG-NAME>` with your actual access token and organization name, respectively.
+
+3. **Clone the Git Repository**:
+   ```bash
+   git clone "$REPO_URL" /tmp/temp_repo
+   ```
+   - This command clones the Git repository specified by `REPO_URL` into the `/tmp/temp_repo` directory.
+
+4. **Navigate into the Cloned Repository Directory**:
+   ```bash
+   cd /tmp/temp_repo
+   ```
+   - This command changes the current working directory to the directory where the repository was cloned (`/tmp/temp_repo`).
+
+5. **Make Changes to Kubernetes Manifest File(s)**:
+   ```bash
+   sed -i "s|image:.*|image: <ACR-REGISTRY-NAME>/$2:$3|g" k8s-specifications/$1-deployment.yaml
+   ```
+   - This command uses `sed` (stream editor) to replace occurrences of the image tag in the Kubernetes deployment manifest file (`$1-deployment.yaml`).
+   - The placeholder `$1` represents the deployment name, `$2` represents the ACR registry name, and `$3` represents the image tag. They are replaced accordingly.
+
+6. **Add Modified Files**:
+   ```bash
+   git add .
+   ```
+   - This command stages all modified files in the repository for the next commit.
+
+7. **Commit the Changes**:
+   ```bash
+   git commit -m "Update Kubernetes manifest"
+   ```
+   - This command commits the staged changes with the commit message "Update Kubernetes manifest".
+
+8. **Push Changes to Repository**:
+   ```bash
+   git push
+   ```
+   - This command pushes the committed changes to the remote repository.
+
+9. **Cleanup: Remove Temporary Directory**:
+   ```bash
+   rm -rf /tmp/temp_repo
+   ```
+   - This command removes the temporary directory `/tmp/temp_repo`, which was used for cloning the repository and making changes.
+
+That's the breakdown of the script. It automates the process of updating Kubernetes manifest files in an Azure DevOps Git repository, making it convenient for deployment workflows.
+
+NB: I made changes to the app.py to indicate summer vs winter.. as a developer..
+
+
+ AKS vs Self Managed Kubernetes Clusters:
+--------------------------------------------
+We have 3 ways in which we can create our k8s cluster.
+1. Azure managed Kubernetes Cluster.
+2. Self managed kubernetes cluster using vm created in Azure cloud.
+3. Self managed kubernetes cluster created in on-premise data center.
+What option is best?
+
+NOTE THESE FACTS:
+----------------------
+Design and Install a Kubernetes Cluster::;
+Before you design a cluster, you must ask relevant questions..
+
+1. Purpose
+a. Education
+Use--> Minikube
+Single node cluster with kubeadm/GCP/AWS
+
+b Development and testing
+Multi-node cluster with a single master and multi workers.
+setup using kubeadm/GCP/AWS/AKS
+
+c. Hosting production applications
+High avai. multi node cluster with multi master node.
+setup using kubeadm/GCP/AWS/AKS/kops or other supported platform
+upto 5000 nodes
+upto 150,000 pods per cluster
+upto 300,000 total containers
+upto 100 pods per node.
+
+2. Cloud or Onprem
+3. Workloads
+a. How many application are going to be hosted on the cluster
+b. What kind of application will be hosted on the cluster.
+i. Web application
+ii. Big Data/Analytics
+
+4. Application Resource Requirments
+  i. CPU intensive
+  ii. Memory intensive
+
+  5. Traffic
+  i. Heavy traffic
+  ii. Burst traffic
+
+
+
+
+
+  Choosing Kubernetes Infrastructure:
+  turnkey solutions:
+  1. vagrant
+  2. vmware cloud pks
+  3 openshift
+  4. cloud foundry cr
+
+  hosted solutions:
+  1 GKE
+  2 EKS
+  3. AKS
+  4. OPENSHIFT ONLINE
+
+Deploy an E-Commerce Project on Azure Kubernetes Service:
+This is an e-commerce application, we have to first understand the architecture of the app.
+Stan's Robot Shop is a sample microservice application you can use as a sandbox to test and learn containerised application orchestration and monitoring techniques.
+It is not intended to be a comprehensive reference example of how to write a microservices application,
+although you will better understand some of those concepts by playing with Stan's Robot Shop.
+To be clear, the error handling is patchy and there is not any security built into the application.
+
+The list of microservices that makes up the stans Robot shop.
+1. User microservice --> Takes care of the user registration.
+Once the users registers, there is a validation to check the email and the user details is recorded in the database.
+The user then logs in with his registered credential, which is validated in the database.
+so there is a db that records the user input from the user microservice.
+
+2. catalouge microservice: Within this catalouge theres an image etc
+
+3. cart microservice: say you like any of the robots in the catalouge, you can select it and add it to the cart.
+even though i login or logout the information has to be preserved in the cart.
+when i checkout, it will no longer be in the cart but the purchased item..
+4. payment microservice: This microservice handles the payment, once you go to the cart and finish it, youll be redirected to the payment microservice..
+
+5. shiiping microservice: This calculates the distance the item will be shipped based on the address and the amount
+
+6. dispatch microservice: Once payment is confirmed a item will be shipped..
+
+7. web microservice: This can be nginx or apache for deploying the app.
+8. ratings microservice: gives you ratings relating to each robot or item..
+
+Important:
+-------------
+The user microservice, the catalouge uses mongodb db
+The cart microservice uses redis for in Memory
+the entire project uses mysql to store images.
+
+The use of the various db solution is to give you a better experience on how these dbs work.
+why will one choose redis db against mongodb or mysql: This can be due to application requirements, say we have a ratings application.
+you understand that ratings changes, you can check a product with 100 ratings and a few min later its 200 theyre dynamic..
+using redis which is an in memory db or caching mechanism is ideal b/c redis is fast in retreiving informations.
+if you put those ratings in a mysql or mongodb db, there will be latency in retreiving it.
+but with redis which is an in memory db it will be faster to retreive and compute data.
+
+What will happen if the in memory db pod like redis goes down? In k8s we have pv and pvc, that will hold the data and once another redis pods is redeployed it will access the
+the data in the pv and be in sync.,.
+
+when should i go for azure files or azure disk?
+1. azure disk: if your storage is accessed by a single pod use azure disk which is ebs in aws. with accessmode as readWriteOnce
+2. azure files: if your storage is accessed by multiple pods in diff nodes, use azure files.. nfs in aws and acessmode should be readWriteMany
+
+Sometimes you might want to use external storage solutions like
+1. Netapp etc, then you will have to create csi driver which will enable you connect and use those external storage solutions..
+
+Important:
+  In AKS you can enable an ingress controller,
+  Click on the cluster ---> networking and select enable ingress controller..
+  It is very easy on aks but in aws you will have to deploy the ingress controller and configure it..
+  Say in eks you have to deploy csi drivers but these things come inbuilt in azure kubernetes cluster.
+  for aks the ingress controller name or ingressClassName is azure-application-gateway
+
+  Configuration of the application..
+  1. Create resource group
+  2. create vm for the runner and install dependencies
+  3. create k8s cluster
+
+  ISSUES WITH DEPLOYMENT:
+  https://github.com/helm/helm/issues/7264
+  The answer i got:
+  Check the chart for any stray files that may have crept in there. Usually this can occur because there may be some files that are being included as part of the chart.
+  my answer: That was exactly the problem.. I had so tar files in the directly containing the chart.yaml.
