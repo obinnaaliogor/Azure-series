@@ -1165,3 +1165,54 @@ Important:
   The answer i got:
   Check the chart for any stray files that may have crept in there. Usually this can occur because there may be some files that are being included as part of the chart.
   my answer: That was exactly the problem.. I had so tar files in the directly containing the chart.yaml.
+
+  Azure DevOps Scenario
+  -------------------------
+
+Creating Effective Monitoring System on Azure, Monitor, Prometheus, Network Watcher
+What exactly does a Devops or sre engineer monitor?
+do they just monitor cpu or memory utilization by your application on a node? no.
+for an end user to access an application there are diff chains or component that it has to access to get a response or reach the application.
+these various aspect of our app has to be monitored for optimal performance. This way you will build an effective monitoring tools..
+1. you have the vnet and its components such as firewall,subnet,nsg etc.
+2. The cluster and its components, the apiserver,etcd,scheduler,kube-controller-manager, the worker node component and the applications running in them.
+3. storage solutions such as blob,azure disk,azure files etc.
+4. vm, serverless fxs and lots of more resources..
+
+it is my responsibility as a devops engineer to setup these network or infrastructure and monitor them.
+build an effective monitoring framework to monitor the built infrastructure and it components or services.
+
+important:
+monitoring is divided into 6 layers..
+1. network traffic or components monitoring: if the network component are not responsive or working as intended, users will not be able to access the application in the cluster.
+this results in bad user experience.
+2. nodes and node pools: in aks the nodepools are created using vm scale sets. monitoring of the node is essential.
+check if the vmss is functioning accordingly. are the node reaching 100% cpu/memory useage.. if this is the case your node wont work as intended bc it has reahed it max capacity.
+
+for 1 and 2 above we collect these metrics and perform analysis and send an alert if the components are not performing well.
+3. controlePlane: Monitoring of controlplane component is very important, you might say aks manages that and therefor it must be ok.
+When there is an issue with the apiserver, etcd and scheduler etc.. There will be a bad user experience. This is why you should monitor those components..
+
+4. The dataplane component: You can monitor the pods/containers to ensure that it is working as expected.
+
+5. APM Monitoring: application performance monitoring, if this is not monitored it will result in bad user experience.
+say your application is not responding to 100s of request even though the application gateway is working properly, it will result to bad user experience.
+
+6. vm, storage accounts and serverless fxns monitoring:
+
+Important:
+what are the tools available for monitoring?
+Can i use a single tool for all of them? the answer is yes but that is not advisable...
+The tool you might be using to monitor application performance might be working but it might not be the best tool...
+It is best to pick the tool that is best for each level of monitoring..
+
+THINGS TO MONITOR AND RECOMMENDED TOOLS FOR THE MONITORING
+1. network traffic or components monitoring: use Network watcher in azure, This can monitor NSG, vnet, ip flow vpn, firewall, WAF
+2.  nodes and node pools: Say cpu, memory use Prometheus.. azure has managed prometheus by azure.
+
+3 controlePlane: use azure monitor,
+4. The dataplane component: container/pods use prometheus
+5. APM Monitoring: use application insight which is part of azure-monitor..
+
+6. vm, storage accounts and serverless fxns monitoring: use azure monitor, in azure monitor you will see storage act and other services simply link it for monitoring.
+also integrate your vm etc..
