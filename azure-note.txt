@@ -200,8 +200,8 @@ This role is assigned to the entity/service that needs to access the service.
 Since vm wants to access resources in blob storage service, we then create a role that will enable vm to do this and assign it to the vm..
 
 Important: when a service wants to talk to other service, in azure we use the concept of.
-1. service principle --> This is created and managed by the user and access of the service principle rotated by the user.
-2. managed Identities --> This azure manages the access rotation once a user creates it.
+1. service principle --> This is created and managed by the user and access of the service principle is rotated by the user.
+2. managed Identities --> This, azure manages the access rotation once a user creates it.
 Summarily ..
 grant a role to the vm called managed identity to be able to access blob containers..
 NB: We have system assigned managed identity and user assigned managed identity.
@@ -1216,3 +1216,220 @@ THINGS TO MONITOR AND RECOMMENDED TOOLS FOR THE MONITORING
 
 6. vm, storage accounts and serverless fxns monitoring: use azure monitor, in azure monitor you will see storage act and other services simply link it for monitoring.
 also integrate your vm etc..
+
+
+ Azure Key Vault Integration with AKS.
+ Kubernetes Secret Store CSI Driver with Azure Vault.
+ How a secret stored in azure key vault can be made available to a pod in the k8s cluster.
+
+ 1. key vault is a secret management service in azure that is used to store sensitive informations like secrets, api keys, tokens and certificates.
+ in most applications, ex k8s, cicd tools like github actions they have environment variable and secret stores for storing sensitive data.
+
+ why should we use key vault?
+ 1. it is a centralized solution where you can store secrets and any sensitive data.
+ 2. secrets or data stored in key vault can be rotated. Adhering to security best practices every 90 days or less.
+ 3. when your secret, api token, database credentials, certificates are spread accross diff tools. How can you manage them and rotate them in a timely manner?
+ This is why we need a centralized secret management solution.
+
+ Key-vault comes with RBACK and it can be integrated with managed identities and service principle.
+ Once you understand the keyvalut demo, you can integrate the azure cicd secrets using keyvault.
+ all your secret in terraform, python, ansible can be stored in azure key vault.
+
+ IMPLEMENTATION AND MORE CONCEPT ON CSI DRIVER.
+
+ # Connect your Azure ID to the Azure Key Vault Secrets Store CSI Driver
+### Configure workload identity
+### Exporting some environment variables
+```
+export SUBSCRIPTION_ID=fe4a1fdb-6a1c-4a6d-a6b0-dbb12f6a00f8
+export RESOURCE_GROUP=keyvault-demo
+export UAMI=azurekeyvaultsecretsprovider-keyvault-demo-cluster
+export KEYVAULT_NAME=aks-demo-abhi
+export CLUSTER_NAME=keyvault-demo-cluster
+
+az account set --subscription $SUBSCRIPTION_ID
+```
+ 1. Say we have a use case where we have to store our cicd secrets in a key vault instance and refernce it in our pipeline.
+ 2. A use case where we have a pods in AKS that needs access to secrets stored in Azure key vault.
+
+ we will deal with number 2, how can this be achieved? pod is in the kubernetes cluster and key vault is outside the kubernetes cluster.
+ This involves many concepts:
+ 1. we will use secret store csi driver. normally csi drivers are used to mount external storage solutions into our kubernetes pods.
+ say your pod wants to use storage from external providers like azure files, netapp, aws nfs, azure disk etc. you want to get the storage from these vendors and then mount it
+ as a volume in your kubernetes pods, we use the concept of pv but to create the volume outside your kubernetes cluster you need to install a csi driver.
+ how is this done?
+ kubernetes has a csi interface or csi API. The storage solutions has to create the csi driver. so as a devops engineer its your responsibility to integrate the csi driver
+ with kubernetes api to request for a particular volume.
+ how does this work? when the developer requests for a pv using pvc via a sc this requests goes through the k8s csi api and creates a volume in the target providers platform
+ and this is then mounted as a volume to the pods.
+
+ 3 What about secret store csi driver?
+ The secret store csi driver is a special type of csi driver used in k8s to retreive secret from external secret storage solutions suchs as hcl vault,
+azure key vault aws secret manager. The retreived secret is mounted to a pod as volume where it then reads the secret.
+Implementation:
+  1. Install the secret store csi driver in the k8s cluster.
+  2. Install the secret provider plugin in the k8s cluster eg. hcl vault plugin, azure vault plugin or aws secret manager plugin for the csi driver to know the secret provider
+  that it will target to get secret from..
+In creating aks, you have an option to enable secret store csi driver as an add on, azure key vault provider as addon <run k get pods -n kube-system to see the pods>.
+ In this case the kubernetes pod will be able to talk to azure key vault provider to get secret.
+
+ That is not all, remember for a service to talk to another service in azure it needs a managed identities or service principle.
+ 3. we create a managed identities with permission to read and get secret from keyvault, using this managed identity, it will allow the specific pod talk to the target key vault instance in azure.
+ There might be 100s of pods in the k8s cluster but we want a particular pod to access this secret, what do we do?
+ we will map or integrate the managed identity created to the service account of the pod. This way the pod assigned the sa will perform the action of accessing the secret.
+
+### Create a managed identity and export some parameters.
+
+```
+az identity create --name $UAMI --resource-group $RESOURCE_GROUP
+
+export USER_ASSIGNED_CLIENT_ID="$(az identity show -g $RESOURCE_GROUP --name $UAMI --query 'clientId' -o tsv)"
+export IDENTITY_TENANT=$(az aks show --name $CLUSTER_NAME --resource-group $RESOURCE_GROUP --query identity.tenantId -o tsv)
+
+ 4. We use the oidc concept to integrate sa with managed identities..
+ To connect the serviceaccount of kubernetes pod to the azure managed identities we need an OIDC Provider.
+ it is important to know at this point that the managed identities has the permission to get secret from azure key vault and when the sa of pod is linked to it the sa
+ inherits the permission and when the sa is assigned to a pod the pod inherits the permission and is able to read and get secrets from azure key vault.
+ Note: When we created the cluster we enabled oidc issuer, we will need to export some of details of the oidc to be used in the next step.
+
+ ### Get the AKS cluster OIDC Issuer URL
+```
+export AKS_OIDC_ISSUER="$(az aks show --resource-group $RESOURCE_GROUP --name $CLUSTER_NAME --query "oidcIssuerProfile.issuerUrl" -o tsv)"
+echo $AKS_OIDC_ISSUER
+```
+### Create the service account for the pod
+```
+export SERVICE_ACCOUNT_NAME="workload-identity-sa"
+export SERVICE_ACCOUNT_NAMESPACE="default"
+```
+
+```
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations:
+    azure.workload.identity/client-id: ${USER_ASSIGNED_CLIENT_ID}
+  name: ${SERVICE_ACCOUNT_NAME}
+  namespace: ${SERVICE_ACCOUNT_NAMESPACE}
+EOF
+```
+
+### Setup Federation
+
+```
+export FEDERATED_IDENTITY_NAME="aksfederatedidentity"
+
+az identity federated-credential create --name $FEDERATED_IDENTITY_NAME --identity-name $UAMI --resource-group $RESOURCE_GROUP --issuer ${AKS_OIDC_ISSUER} --subject system:serviceaccount:${SERVICE_ACCOUNT_NAMESPACE}:${SERVICE_ACCOUNT_NAME}
+```
+
+FINALLY:
+We will create a secret providerclass and in the secret provider class we will mention what secret in key vault we want to access.
+Then mount the secret providerclass as a volume to the pod that has the sa that should access azure key vault to read secret.
+### Create the Secret Provider Class
+
+```
+cat <<EOF | kubectl apply -f -
+# This is a SecretProviderClass example using workload identity to access your key vault
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: azure-kvname-wi # needs to be unique per namespace
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    clientID: "${USER_ASSIGNED_CLIENT_ID}" # Setting this to use workload identity
+    keyvaultName: ${KEYVAULT_NAME}       # Set to the name of your key vault
+    cloudName: ""                         # [OPTIONAL for Azure] if not provided, the Azure environment defaults to AzurePublicCloud
+    objects:  |
+      array:
+        - |
+          objectName: secret1             # Set to the name of your secret
+          objectType: secret              # object types: secret, key, or cert
+          objectVersion: ""               # [OPTIONAL] object versions, default to latest if empty
+        - |
+          objectName: key1                # Set to the name of your key
+          objectType: key
+          objectVersion: ""
+    tenantId: "${IDENTITY_TENANT}"        # The tenant ID of the key vault
+EOF
+```
+
+ important: when creating azure key vault enable rbac so you can configure accesses on the key vault.
+ make sure that the managed identities created has the right permission to retreive secret from key vault.
+ get the key vault scope and use it to map to the managed identity.. This can also be done from the UI.
+run,
+### Create a role assignment that grants the workload ID access the key vault
+```
+export KEYVAULT_SCOPE=$(az keyvault show --name $KEYVAULT_NAME --query id -o tsv)
+
+az role assignment create --role "Key Vault Administrator" --assignee $USER_ASSIGNED_CLIENT_ID --scope $KEYVAULT_SCOPE
+
+
+VERIFICATION OF WORK:
+---------------------------------------
+# Verify Keyvault AKS Integration
+
+### Create a sample pod to mount the secrets
+
+```
+cat <<EOF | kubectl apply -f -
+# This is a sample pod definition for using SecretProviderClass and workload identity to access your key vault
+kind: Pod
+apiVersion: v1
+metadata:
+  name: busybox-secrets-store-inline-wi
+  labels:
+    azure.workload.identity/use: "true"
+spec:
+  serviceAccountName: "workload-identity-sa"
+  containers:
+    - name: busybox
+      image: registry.k8s.io/e2e-test-images/busybox:1.29-4
+      command:
+        - "/bin/sleep"
+        - "10000"
+      volumeMounts:
+      - name: secrets-store01-inline
+        mountPath: "/mnt/secrets-store"
+        readOnly: true
+  volumes:
+    - name: secrets-store01-inline
+      csi:
+        driver: secrets-store.csi.k8s.io
+        readOnly: true
+        volumeAttributes:
+          secretProviderClass: "azure-kvname-wi"
+EOF
+```
+
+### List the contents of the volume
+
+```
+kubectl exec busybox-secrets-store-inline-wi -- ls /mnt/secrets-store/
+```
+
+### Verify the contents in the file
+
+```
+kubectl exec busybox-secrets-store-inline -- cat /mnt/secrets-store/foo-secret
+```
+
+
+Introduction to Serverless using Azure Functions:
+Real Time Usecases:
+How a devops engineer implements cloud cost optimization for an organization..
+Scaling and performance optimization
+How a devops engineer manages cloud configuration against the compliance and security guidelines of an organization.
+The term serverless does not mean no server but the dynamic provision and deletion of server whe needed.
+
+use cases
+--------------
+say a developer is in need of blob storage. he creates the needed storage that allowed public access and in the org theres a policy that requires that
+all blob containers created should have public access disabled..
+say also the hot and cold lifecycle mgt wasnt implemented per requirement.
+1. this poses security risk of data in the blob due to the public access being enabled.
+2. cost overhead is incured due to the non compliant with the lifecycle mgt policy.
+
+We can you serverless fxn in azure to implement this policys accross our account once an event occurs like creation of blob etc to check if best practices where followed.
