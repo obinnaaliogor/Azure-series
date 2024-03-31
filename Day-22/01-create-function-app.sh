@@ -22,3 +22,4 @@ az storage account create --name $storage --location "$location" --resource-grou
 # Create a serverless python function app in the resource group.
 echo "Creating $functionApp"
 az functionapp create --name $functionApp --storage-account $storage --consumption-plan-location "$location" --resource-group $resourceGroup --os-type Linux --runtime python --runtime-version $pythonVersion --functions-version $functionsVersion
+

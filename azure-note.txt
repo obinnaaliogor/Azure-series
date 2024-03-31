@@ -1426,10 +1426,297 @@ The term serverless does not mean no server but the dynamic provision and deleti
 
 use cases
 --------------
-say a developer is in need of blob storage. he creates the needed storage that allowed public access and in the org theres a policy that requires that
+say a developer is in need of blob storage. he creates the needed storage that allowed public access to the blob container and in the org theres a policy that requires that
 all blob containers created should have public access disabled..
-say also the hot and cold lifecycle mgt wasnt implemented per requirement.
+say also the hot and cold lifecycle mgt wasnt implemented per requirement in the creation of the storage.
 1. this poses security risk of data in the blob due to the public access being enabled.
 2. cost overhead is incured due to the non compliant with the lifecycle mgt policy.
 
 We can you serverless fxn in azure to implement this policys accross our account once an event occurs like creation of blob etc to check if best practices where followed.
+It then perform action of deny, warning of policy or compliant violation or mutate the creation.
+say blob containers are created once or twice in a month, we shouldnt have a stale vm running that has our python code and enforces this policy.
+having a stale vm is not cost effective, we can have azure create vm that has our appcode or pythoncode for us each time a request is made to provision blob strorage
+this then runs our code for compliance..
+
+important:
+azure will charge you based on the number of time the serverless or azure fxn is invoked..
+why run a vm 247 if you dont need it? why run any infrastructure 247 when it is not needed.
+
+say we have a java application which is hosted in a vm, when users makes a request to the java app, the java app talks
+ to the db and retreives information and sends it back to the user. we can put this java app in a serverless fxn so that each time a request comes on the java app a
+ serverless fxn will be invoked or a vm will be provisioned by azure to handle that request in micro sec.
+ You will not be charged when your api or serverless fxn is idel.
+
+ another use case:
+ lets say for example we have a use case that files uploaded to the blob storage should not exceed 1gb.
+ Users uploads files to the blob container. When file is equal or greater than 1 gb is uploaded a serverless fxn in azure is invoked which sends a warning to the user that
+ his file size shouldnt be 1gb of size and the file deleted or compressed.
+
+ use case of queue storage:
+ Use Case: Handling User Requests Sequentially with Azure Queue Storage;
+ say we put items in the queue say user requests, when there are multiple user requests these requests are stored in azure queue storage and processed on accordingly
+ based on first come first server bases using azure serverless fxn.
+ user request could be to access application and reteive data from  db or access github act and give me number of pull requests that are active.
+Azure Queue Storage can be effectively used in scenarios where you need to handle asynchronous processing of user requests, especially when you want
+to process them in a sequential manner (e.g., first-come, first-served). Here's how you can utilize Azure Queue Storage for the use case you provided:
+
+### Use Case: Handling User Requests Sequentially with Azure Queue Storage
+
+1. **Request Submission:**
+   - Users submit requests to access your application or retrieve data from a database.
+   - For example, a user requests data from the application or asks for the number of active pull requests from a GitHub repository.
+
+2. **Enqueue Requests:**
+   - Each user request is enqueued into an Azure Queue Storage.
+   - The queue ensures that requests are stored in the order they are received, facilitating first-in, first-out (FIFO) processing.
+
+3. **Azure Function for Processing:**
+   - An Azure Function is triggered by messages in the queue.
+   - This serverless function processes each request as it becomes available in the queue.
+   - For instance, the function may retrieve data from the database or interact with the GitHub API to fetch the number of active pull requests.
+
+4. **Sequential Processing:**
+   - The Azure Function processes each request sequentially, following the order in which they were enqueued.
+   - This ensures that requests are handled on a first-come, first-served basis, maintaining fairness and consistency.
+
+5. **Response Handling:**
+   - After processing, the Azure Function generates a response to the user request.
+   - For example, it may return the requested data or information about the active pull requests.
+
+6. **Dequeue Requests:**
+   - Once processed, requests are dequeued from the Azure Queue Storage.
+   - This prevents duplicate processing and ensures that each request is handled exactly once.
+
+### Benefits of Using Azure Queue Storage:
+
+- **Scalability:** Azure Queue Storage automatically scales to accommodate varying request loads, ensuring reliable performance.
+- **Reliability:** Queue Storage provides high availability and durability for your queued messages, minimizing the risk of data loss.
+- **Decoupling:** By decoupling request submission from processing, you can handle bursts of requests without overwhelming your application.
+- **Cost-Effective:** Queue Storage is cost-effective for handling asynchronous workloads, as you only pay for the storage and data transfer incurred.
+
+### Considerations:
+
+- **Message Visibility Timeout:** Set an appropriate message visibility timeout to ensure that messages remain invisible to other
+consumers while being processed by the Azure Function.
+- **Dead-Letter Queue:** Configure a dead-letter queue to capture messages that cannot be processed after a certain number of attempts,
+allowing for manual investigation and troubleshooting.
+
+By leveraging Azure Queue Storage and Azure Functions, you can efficiently handle user requests in a sequential manner, ensuring fairness
+and responsiveness in your application.
+
+Important:
+  in serverless fxn, you dont own the server when or if you dont use it.
+  in vm once created and in running mode you will be charged.
+
+  sample code:
+  Below is an example Azure Function written in Python that monitors a blob container for file uploads.
+  If a file with a size equal to or greater than 1GB is uploaded, the function sends a warning to the user and optionally deletes or compresses the file.
+
+```python
+import os
+import logging
+import azure.functions as func
+from azure.storage.blob import BlobServiceClient
+
+def main(blob: func.InputStream):
+    # Get environment variables
+    storage_connection_string = os.environ["STORAGE_CONNECTION_STRING"]
+    warning_threshold = int(os.environ.get("WARNING_THRESHOLD", 1024))  # Size threshold in MB, default 1GB
+    delete_on_warning = os.environ.get("DELETE_ON_WARNING", "false").lower() == "true"
+    compress_on_warning = os.environ.get("COMPRESS_ON_WARNING", "false").lower() == "true"
+
+    # Initialize logging
+    logging.basicConfig(level=logging.INFO)
+
+    # Get blob size
+    blob_size_mb = blob.length / (1024 * 1024)  # Convert bytes to megabytes
+
+    if blob_size_mb >= warning_threshold:
+        logging.warning(f"Uploaded file size ({blob_size_mb} MB) exceeds warning threshold ({warning_threshold} MB)")
+
+        # Send warning to user (Implement your logic here, e.g., email, push notification)
+
+        # Optionally, delete or compress the file
+        if delete_on_warning:
+            logging.info("Deleting the file")
+            blob_uri = os.environ["WEBSITE_HOSTNAME"] + blob.name
+            delete_blob(storage_connection_string, blob_uri)
+        elif compress_on_warning:
+            logging.info("Compressing the file")
+            # Implement file compression logic here
+
+def delete_blob(storage_connection_string, blob_uri):
+    blob_service_client = BlobServiceClient.from_connection_string(storage_connection_string)
+    container_name, blob_name = blob_uri.split("/", 1)
+    container_client = blob_service_client.get_container_client(container_name)
+    blob_client = container_client.get_blob_client(blob_name)
+    blob_client.delete_blob()
+
+```
+
+In this function:
+
+- The function is triggered whenever a file is uploaded to the blob container. The trigger type is an input stream (`func.InputStream`).
+- The function retrieves the size of the uploaded file and checks if it exceeds the warning threshold (1GB by default).
+- If the file size exceeds the threshold, a warning is logged and the function optionally deletes or compresses the file.
+- The Azure Storage connection string and other settings are retrieved from environment variables.
+- If `DELETE_ON_WARNING` is set to `true`, the function deletes the file. If `COMPRESS_ON_WARNING` is set to `true`, the
+function compresses the file (implement compression logic as needed).
+- The `delete_blob` function is used to delete the file from the blob container.
+
+To use this function, you'll need to create an Azure Function App, set up a blob trigger, and configure the necessary environment variables.
+ Additionally, you may need to adjust the warning threshold and implement the logic for sending warnings to users.
+
+
+ MORE USE Case
+ -------------------
+ Below is a Python function that demonstrates how you can implement the described use case using Azure Queue Storage and Azure Functions.
+ This function assumes you have already set up an Azure Queue Storage and an Azure Function with a queue trigger.
+
+```python
+import os
+import logging
+from azure.storage.queue import QueueClient
+from azure.functions import func
+
+def process_user_requests(message: func.QueueMessage):
+    # Retrieve the user request from the queue message
+    user_request = message.get_body().decode('utf-8')
+    logging.info(f"Processing user request: {user_request}")
+
+    # Process the user request based on its content
+    if "access application" in user_request:
+        # Placeholder for application access logic
+        logging.info("Accessing application and retrieving data from the database...")
+        # Implement logic to access application and retrieve data from the database
+        # For example:
+        # - Access database
+        # - Retrieve requested data
+
+    elif "active pull requests" in user_request:
+        # Placeholder for GitHub API access logic
+        logging.info("Accessing GitHub API to fetch the number of active pull requests...")
+        # Implement logic to access GitHub API and fetch the number of active pull requests
+        # For example:
+        # - Use GitHub API to fetch pull requests
+        # - Count the number of active pull requests
+
+    else:
+        logging.warning("Unknown user request")
+
+    # Delete the processed message from the queue
+    message.delete()
+
+def main(msg: func.QueueMessage):
+    try:
+        process_user_requests(msg)
+    except Exception as e:
+        logging.error(f"An error occurred while processing the user request: {e}")
+
+if __name__ == "__main__":
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+    # Initialize the Azure Queue client
+    connection_string = os.environ["AzureWebJobsStorage"]
+    queue_name = os.environ["QueueName"]
+    queue_client = QueueClient.from_connection_string(connection_string, queue_name)
+    # Fetch messages from the queue and process them
+    for message in queue_client.receive_messages():
+        process_user_requests(message)
+```
+
+In this function:
+
+- The function `process_user_requests` processes each user request retrieved from the Azure Queue message.
+- Depending on the content of the user request, the function performs different actions,
+such as accessing the application and retrieving data from the database or fetching the number of active pull requests from GitHub.
+- After processing, the message is deleted from the queue to ensure it's not processed again.
+- The `main` function is the entry point for Azure Functions and calls `process_user_requests` for each queue message received.
+- Error handling is implemented to log any exceptions that occur during processing.
+- The function is designed to be deployed as an Azure Function triggered by messages in
+the Azure Queue Storage queue specified in the `AzureWebJobsStorage` environment variable.
+- Logging is used to provide visibility into the processing of user requests and any errors encountered.
+
+Before using this function, make sure to replace placeholders (such as application access logic and GitHub API access logic) with your actual implementation.
+ Additionally, configure the Azure Function settings and environment variables according to your Azure environment and requirements.
+
+
+Let's break down the Python code provided for the Azure Function that processes user requests stored in an Azure Queue Storage.
+
+### Function Overview:
+The function is designed to be triggered by messages in an Azure Queue Storage queue.
+ It processes each user request stored as a message in the queue, performs the necessary actions based on the request content,
+ and deletes the processed message from the queue.
+
+### Key Components:
+
+1. **Azure Function Entry Point (`main` function):**
+   - This function serves as the entry point for the Azure Function and is triggered by messages in the
+   Azure Queue Storage queue specified in the `AzureWebJobsStorage` environment variable.
+   - It receives a `QueueMessage` object representing a message from the queue as input.
+   - It calls the `process_user_requests` function to process each queue message.
+
+2. **User Request Processing Function (`process_user_requests` function):**
+   - This function processes each user request retrieved from the Azure Queue message.
+   - It takes a `QueueMessage` object as input.
+   - It retrieves the content of the message, which represents the user request.
+   - It checks the content of the user request and performs different actions based on the request type:
+     - If the request is to access the application and retrieve data from the database, it logs the action and potentially implements the application access logic.
+     - If the request is to fetch the number of active pull requests from GitHub, it logs the action and potentially implements the GitHub API access logic.
+     - If the request type is unknown, it logs a warning message.
+   - After processing the request, it deletes the message from the queue to ensure it's not processed again.
+
+3. **Error Handling:**
+   - The code includes a `try-except` block to handle exceptions that may occur during request processing.
+   - If an exception occurs, an error message is logged.
+
+4. **Initialization and Logging:**
+   - The code initializes logging to provide visibility into the processing of user requests and any errors encountered.
+   - It sets up logging to output messages with different severity levels (INFO, WARNING, ERROR).
+
+5. **Azure Queue Client Initialization:**
+   - It initializes the Azure Queue client using the connection string retrieved from the `AzureWebJobsStorage` environment variable.
+   - It fetches messages from the queue using the `receive_messages` method and processes them using the `process_user_requests` function.
+
+### Deployment and Configuration:
+Before deploying and running the function, you need to:
+- Configure the Azure Function settings and environment variables, including the `AzureWebJobsStorage` connection string and the queue name.
+- Replace the placeholder implementation with your actual logic for accessing the application and interacting with the GitHub API.
+- Deploy the function to Azure using Azure Functions.
+
+### Use Case:
+This function is suitable for scenarios where you need to process user requests asynchronously,
+such as accessing an application or interacting with external services like GitHub, and maintain a sequential processing order based on the order of request submission.
+
+Note in a free tier azure subscription, the serverless fxn is slow.
+azure fxn app: this is like resource group. before creating azure fxn you have to create azure fxn app to hold or group the azure functions.
+similar to storage act which is used to group storages.. this ensures centralized rbac and other properties control.
+there4 to create azure fxn you have to first create a azure fxn app then create azure fxn.
+
+There are 3 ways to implement you azure fxns:
+1. via the CLI OR OTHER editors
+2. VIA THE UI or portal
+3. VIA vscode desktop
+Important: if you do not use the right architecture or os type or didnt use the right python version.
+you might end up not seeing the 1,2,3 types or ways of implememting azure fxn when you access the azure fxn app.
+
+examples of functions triggers:
+1. blob trigger
+2. cosmodb trigger
+3. eventgride
+4. http trigger
+5. queue trigger
+6. eventhub trigger
+7. serverhub queue trigger
+8 serverbus topic trigger
+9. time trigger
+
+important: when you see path option while creating az fxn, say targeting blob containers. it means you have to specify the target
+blob container eg blob1/(name) where name is constant, its left that way and blob1 is the actual name of your blob container.
+since we do not kwn the name of the file a user will upload, (name) will be overriden with the actual name of the users file.
+
+NB: azure fxn has.
+1. code + test: shows your azz fxn codes
+2. monitors:  shows success count and failures --> logs and invocations
+3. integration: shows you the fxn name, the trigger, output and input
+4. fxn key: the password or keys of the az fxn
